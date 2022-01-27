@@ -1,6 +1,7 @@
 package pagerduty
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"regexp"
@@ -9,7 +10,6 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 	"github.com/heimweh/go-pagerduty/pagerduty"
 )
 
@@ -66,10 +66,25 @@ func resourcePagerDutyUserContactMethod() *schema.Resource {
 			},
 
 			"address": {
-				Type:         schema.TypeString,
-				Required:     true,
-				ValidateFunc: validation.StringMatch(regexp.MustCompile(`^[1-9][\d]+$`), "must be all digits"),
+				Type:     schema.TypeString,
+				Required: true,
 			},
+		},
+		CustomizeDiff: func(context context.Context, diff *schema.ResourceDiff, i interface{}) error {
+			t := diff.Get("type").(string)
+			if t == "phone_contact_method" || t == "sms_contact_method" {
+				addr := diff.Get("address")
+				reg, err := regexp.Compile(`^[1-9][\d]+$`)
+				if err != nil {
+					return err
+				}
+				addrStr := addr.(string)
+				if match := reg.MatchString(addrStr); !match {
+					return fmt.Errorf("phone/sms contact method address must be all digits not starting with 0")
+				}
+			}
+
+			return nil
 		},
 	}
 }
